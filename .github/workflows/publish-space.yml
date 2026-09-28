@@ -1,0 +1,33 @@
+name: Validar e publicar no Hugging Face
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Validar configuração
+        run: python scripts/validate_config.py
+      - name: Bloquear credenciais no repositório
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sincronizar Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_ID: ${{ secrets.HF_SPACE_ID }}
+        run: |
+          test -n "$HF_TOKEN" || (echo "Defina o secret HF_TOKEN." && exit 1)
+          test -n "$HF_SPACE_ID" || (echo "Defina o secret HF_SPACE_ID." && exit 1)
+          git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_ID}" HEAD:main
